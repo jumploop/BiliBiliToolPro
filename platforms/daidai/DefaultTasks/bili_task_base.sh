@@ -5,8 +5,8 @@
 # 呆呆面板（Daidai Panel）基础脚本。
 # 设计与 qinglong / baihu 的集成一致：每个面板只维护“自己这一份 base（环境安装部分）”，
 # 而 bili_task_daily.sh 等“各任务脚本”完全复用 qinglong 目录里的同名脚本——
-# 由订阅钩子 daidai/copyshfile.sh 在拉库后、建任务前从 qinglong/DefaultTasks 拷贝过来。
-# 所以本目录默认只放 base，不重复维护各任务脚本（详见 daidai/README.md）。
+# 由订阅钩子 platforms/daidai/copyshfile.sh 在拉库后、建任务前从 platforms/qinglong/DefaultTasks 拷贝过来。
+# 所以本目录默认只放 base，不重复维护各任务脚本（详见 platforms/daidai/README.md）。
 #
 # 本 base 与 qinglong 版的差异只在“面板专属的运行环境安装/定位”：
 #   1. 用仓库根标记文件（Ray.BiliBiliTool.sln）向上查找仓库根目录，stable 与 dev 共用同一份 base；
@@ -67,9 +67,9 @@ find_repo_root() {
 
 BILI_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 bilitool_repo_dir="$(find_repo_root "$BILI_SCRIPT_DIR" || true)"
-# 兜底：找不到标记文件时按目录层级回退（DefaultTasks/ 上跳两级）
+# 兜底：找不到标记文件时按目录层级回退（platforms/daidai/DefaultTasks/ 上跳三级）
 if [ -z "$bilitool_repo_dir" ]; then
-    bilitool_repo_dir="$(cd "$BILI_SCRIPT_DIR/../.." >/dev/null 2>&1 && pwd)"
+    bilitool_repo_dir="$(cd "$BILI_SCRIPT_DIR/../../.." >/dev/null 2>&1 && pwd)"
 fi
 say "bilitool仓库目录: $bilitool_repo_dir"
 
@@ -345,14 +345,14 @@ install() {
         if [ "$prefer_mode" == "dotnet" ]; then
             install_dotnet || {
                 say_err "安装失败，请根据文档自行在面板容器中安装dotnet，或切换为 bilitool 模式"
-                say_err "文档：https://github.com/RayWangQvQ/BiliBiliToolPro/blob/develop/platforms/daidai/README.md"
+                say_err "文档：https://github.com/RayWangQvQ/BiliBiliToolPro/blob/main/platforms/daidai/README.md"
                 return 1
             }
         fi
         if [ "$prefer_mode" == "bilitool" ]; then
             install_bilitool || {
                 say_err "安装失败，请检查日志并重试，或切换为 dotnet 模式"
-                say_err "文档：https://github.com/RayWangQvQ/BiliBiliToolPro/blob/develop/platforms/daidai/README.md"
+                say_err "文档：https://github.com/RayWangQvQ/BiliBiliToolPro/blob/main/platforms/daidai/README.md"
             }
         fi
     fi
@@ -368,15 +368,44 @@ run_task() {
 
     if [ "$prefer_mode" == "dotnet" ]; then
         cd "$bilitool_repo_dir/src/Ray.BiliBiliTool.Console"
-        # 临时 props 文件压制编译告警，保持日志整洁，运行后删除
-        local props_file="$bilitool_repo_dir/Directory.Build.props"
-        local props_created=false
-        if [ ! -f "$props_file" ]; then
-            printf '<Project>\n  <PropertyGroup>\n    <NoWarn>$(NoWarn);NETSDK1188;CS9057;CS8618;CS9042;CS8625;CS8603;CS8602;CS8601;CS8600;CS8604</NoWarn>\n  </PropertyGroup>\n</Project>' >"$props_file"
-            props_created=true
+        local bili_dll="bin/Debug/net10.0/Ray.BiliBiliTool.Console.dll"
+
+        # 呆呆面板靠 stdout 管道 EOF 判断进程结束。dotnet run 会拉起 MSBuild / Roslyn
+        # 编译守护进程，它们继承了这条管道并空闲驻留 15 分钟，面板等不到 EOF，任务就会
+        # 被判成“卡到超时失败”。因此这里：编译输出重定向到文件 + 关闭编译守护进程，
+        # 再直接运行编译产物，进程能立即干净退出。
+        # 另外源码没变时复用上次产物，省掉每次约 9 秒的增量编译；订阅拉取换了源码
+        # （mtime 变新）或产物被删，会自动重新编译。
+        local need_build=1
+        if [ -f "$bili_dll" ] && [ -z "$(find "$bilitool_repo_dir/src" \
+                \( -name '*.cs' -o -name '*.csproj' -o -name 'appsettings*.json' \) \
+                -newer "$bili_dll" -print -quit 2>/dev/null)" ]; then
+            need_build=0
         fi
-        dotnet run -v m -- --ENVIRONMENT=Production
-        [ "$props_created" = true ] && rm -f "$props_file"
+
+        if [ "$need_build" = "1" ]; then
+            # 临时 props 文件压制编译告警，保持日志整洁，编译完即删
+            local props_file="$bilitool_repo_dir/Directory.Build.props"
+            local props_created=false
+            if [ ! -f "$props_file" ]; then
+                printf '<Project>\n  <PropertyGroup>\n    <NoWarn>$(NoWarn);NETSDK1188;CS9057;CS8618;CS9042;CS8625;CS8603;CS8602;CS8601;CS8600;CS8604</NoWarn>\n  </PropertyGroup>\n</Project>' >"$props_file"
+                props_created=true
+            fi
+            local bili_build_log="$bilitool_repo_dir/bin/bili_build.log"
+            if ! dotnet build -v q -nodeReuse:false -p:UseSharedCompilation=false >"$bili_build_log" 2>&1; then
+                say_err "编译失败，最后 30 行日志："
+                tail -30 "$bili_build_log" >&2
+                if [ "$props_created" = true ]; then rm -f "$props_file"; fi
+                return 1
+            fi
+            if [ "$props_created" = true ]; then rm -f "$props_file"; fi
+        else
+            say "源码无变化，跳过编译（复用上次产物）"
+        fi
+
+        local rc=0
+        dotnet "$bili_dll" --ENVIRONMENT=Production || rc=$?
+        return $rc
     else
         cd "$bilitool_repo_dir/bin"
         chmod +x ./Ray.BiliBiliTool.Console && ./Ray.BiliBiliTool.Console --ENVIRONMENT=Production
