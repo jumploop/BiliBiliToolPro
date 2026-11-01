@@ -25,8 +25,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DOCKER_IMG_NAME: zai7lou/bili_tool_web
-  GHCR_IMG_NAME: ghcr.io/raywangqvq/bili_tool_web
+  DOCKER_IMG_NAME: jumploop/bili_tool_web
+  GHCR_IMG_NAME: ghcr.io/jumploop/bili_tool_web
 
 jobs:
   determine-version:
@@ -134,8 +134,8 @@ jobs:
             ${{ env.DOCKER_IMG_NAME }}:latest
             ${{ env.GHCR_IMG_NAME }}:${{ needs.determine-version.outputs.version }}
             ${{ env.GHCR_IMG_NAME }}:latest
-          cache-from: type=registry,ref=ghcr.io/raywangqvq/bili_tool_web:buildcache-stable
-          cache-to: type=registry,ref=ghcr.io/raywangqvq/bili_tool_web:buildcache-stable,mode=max,image-manifest=true
+          cache-from: type=registry,ref=ghcr.io/jumploop/bili_tool_web:buildcache-stable
+          cache-to: type=registry,ref=ghcr.io/jumploop/bili_tool_web:buildcache-stable,mode=max,image-manifest=true
 
   update-changelog:
     name: Update changelog via PR
