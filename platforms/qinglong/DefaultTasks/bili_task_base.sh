@@ -612,7 +612,31 @@ run_task() {
     cd $qinglong_bili_repo_dir/src/Ray.BiliBiliTool.Console
 
     if [ "$prefer_mode" == "dotnet" ]; then
-        dotnet run --ENVIRONMENT=Production
+        local bili_dll="bin/Debug/net10.0/Ray.BiliBiliTool.Console.dll"
+
+        # dotnet run 会拉起 MSBuild / Roslyn 守护进程，它们可能继承输出管道并延迟任务结束。
+        # 源码没变时复用上次产物；源码更新或产物被删时再构建并直接运行 DLL。
+        local need_build=1
+        if [ -f "$bili_dll" ] && [ -z "$(find "$qinglong_bili_repo_dir/src" \
+                \( -name '*.cs' -o -name '*.csproj' -o -name 'appsettings*.json' \) \
+                -newer "$bili_dll" -print -quit 2>/dev/null)" ]; then
+            need_build=0
+        fi
+
+        if [ "$need_build" = "1" ]; then
+            local bili_build_log="$qinglong_bili_repo_dir/bin/bili_build.log"
+            if ! dotnet build -v q -nodeReuse:false -p:UseSharedCompilation=false >"$bili_build_log" 2>&1; then
+                say_err "编译失败，最后 30 行日志："
+                tail -30 "$bili_build_log" >&2
+                return 1
+            fi
+        else
+            say "源码无变化，跳过编译（复用上次产物）"
+        fi
+
+        local rc=0
+        dotnet "$bili_dll" --ENVIRONMENT=Production || rc=$?
+        return $rc
     else
         cp -f "$bilitool_installed_dir/Ray.BiliBiliTool.Console" .
         chmod +x ./Ray.BiliBiliTool.Console && ./Ray.BiliBiliTool.Console --ENVIRONMENT=Production
