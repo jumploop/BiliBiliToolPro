@@ -1,5 +1,6 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Ray.BiliBiliTool.Agent;
+using Ray.BiliBiliTool.Application.Contracts.Cookies;
 using Ray.BiliBiliTool.Config.SQLite;
 using Ray.BiliBiliTool.DomainService.Dtos;
 using Ray.BiliBiliTool.DomainService.Interfaces;
@@ -8,7 +9,9 @@ namespace Ray.BiliBiliTool.Web.Services.Pages.BiliAccount;
 
 public class BiliAccountPageWorkflow(
     IConfiguration configuration,
-    ILoginDomainService loginDomainService
+    ILoginDomainService loginDomainService,
+    ICookieTaskGuard? cookieTaskGuard = null,
+    ILogger<BiliAccountPageWorkflow>? logger = null
 ) : IBiliAccountPageWorkflow
 {
     private readonly IConfigurationRoot _configurationRoot =
@@ -16,6 +19,41 @@ public class BiliAccountPageWorkflow(
         ?? throw new InvalidOperationException(
             "IConfigurationRoot not available — cannot access Providers or Reload()"
         );
+
+    public static void CompactStoredAccounts(IConfigurationRoot configuration)
+    {
+        var provider = configuration.Providers.OfType<SqliteConfigurationProvider>().Single();
+        var indices = provider
+            .GetChildKeys([], "BiliBiliCookies")
+            .Select(key => int.TryParse(key, out var index) ? index : -1)
+            .Where(index => index >= 0)
+            .Order()
+            .ToList();
+        var cookies = indices
+            .Select(index =>
+            {
+                provider.TryGet($"BiliBiliCookies:{index}", out var value);
+                return value;
+            })
+            .Where(value => !string.IsNullOrEmpty(value))
+            .ToList();
+
+        if (
+            indices.Count == cookies.Count
+            && indices.SequenceEqual(Enumerable.Range(0, cookies.Count))
+        )
+            return;
+
+        var values = cookies
+            .Select((value, index) => new { Key = $"BiliBiliCookies:{index}", Value = value! })
+            .ToDictionary(item => item.Key, item => item.Value);
+        var keysToDelete = indices
+            .Where(index => index >= cookies.Count)
+            .Select(index => $"BiliBiliCookies:{index}")
+            .ToList();
+        provider.BatchSet(values, keysToDelete);
+        configuration.Reload();
+    }
 
     public Task<List<BiliAccountDto>> GetAllAccountsAsync()
     {
@@ -42,7 +80,7 @@ public class BiliAccountPageWorkflow(
             _configurationRoot.GetSection("BiliBiliCookies").Get<List<string>>()?.Count ?? 0;
         provider.Set($"BiliBiliCookies:{currentCount}", cookieStr);
         ReloadConfiguration();
-        return Task.CompletedTask;
+        return CheckSavedCookieAsync(cookieStr);
     }
 
     public Task UpdateAsync(int index, string cookieStr)
@@ -53,7 +91,7 @@ public class BiliAccountPageWorkflow(
 
         provider.Set($"BiliBiliCookies:{index}", cookieStr);
         ReloadConfiguration();
-        return Task.CompletedTask;
+        return CheckSavedCookieAsync(cookieStr);
     }
 
     public Task DeleteAsync(int index)
@@ -63,20 +101,18 @@ public class BiliAccountPageWorkflow(
             ?? throw new InvalidOperationException("SqliteConfigurationProvider not found");
 
         var cookieList = _configurationRoot.GetSection("BiliBiliCookies").Get<List<string>>() ?? [];
+        if (index < 0 || index >= cookieList.Count)
+            throw new ArgumentOutOfRangeException(nameof(index));
+
         var newCount = cookieList.Count - 1;
 
-        // Re-key all higher indices down by 1
         var rekeyDict = new Dictionary<string, string>();
         for (int i = index + 1; i < cookieList.Count; i++)
         {
             rekeyDict[$"BiliBiliCookies:{i - 1}"] = cookieList[i];
         }
 
-        if (rekeyDict.Count > 0)
-            provider.BatchSet(rekeyDict);
-
-        // Blank, not drop: an absent row would let cookies.json resurrect the deleted cookie
-        provider.Set($"BiliBiliCookies:{newCount}", string.Empty);
+        provider.BatchSet(rekeyDict, [$"BiliBiliCookies:{newCount}"]);
         ReloadConfiguration();
         return Task.CompletedTask;
     }
@@ -123,6 +159,24 @@ public class BiliAccountPageWorkflow(
         // Per D-02: enrich cookie via SetCookieAsync, then save to SQLite
         var enriched = await loginDomainService.SetCookieAsync(rawCookie, CancellationToken.None);
         await AddAsync(enriched.CookieStr);
+    }
+
+    private async Task CheckSavedCookieAsync(string cookie)
+    {
+        if (
+            cookieTaskGuard is null
+            || !_configurationRoot.GetValue("CookieCheck:AutoCheckEnabled", true)
+        )
+            return;
+        try
+        {
+            await cookieTaskGuard.CheckNowAsync(ParseUserId(cookie), cookie);
+        }
+        catch (Exception)
+        {
+            // A failed check must not undo a saved login or expose request details.
+            logger?.LogWarning("账号已保存，登录状态检查稍后重试");
+        }
     }
 
     private SqliteConfigurationProvider? GetSqliteProvider()

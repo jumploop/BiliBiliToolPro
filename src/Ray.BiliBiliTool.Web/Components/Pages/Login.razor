@@ -1,4 +1,5 @@
 @page "/login"
+@layout Layout.LoginLayout
 @rendermode InteractiveServer
 
 @if (_loginError)
@@ -27,8 +28,3 @@
         </MudCardActions>
     </MudCard>
 </form>
-
-<MudThemeProvider/>
-<MudPopoverProvider/>
-<MudDialogProvider/>
-<MudSnackbarProvider/>

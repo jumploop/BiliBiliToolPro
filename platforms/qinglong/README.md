@@ -1,208 +1,139 @@
-# 在青龙中运行
+# Run with Qinglong
 
-原理是，利用青龙的拉库命令，拉取本仓库源码，自动添加cron定时任务，然后在青龙容器中安装 .NET 10 SDK 或 `bilitool` 的二进制包，定时运行相应的Task。
+Qinglong pulls this repository, registers cron tasks from the shell scripts, and runs them using either a .NET 10 SDK installed in the panel container or a prebuilt `bilitool` binary. Start with a working Qinglong panel.
 
-开始前，请先确保你的青龙面板是运行正常的。
+## Set up the repository
 
-<!-- TOC depthFrom:2 -->
+### Allow shell scripts
 
-- [1. 步骤](#1-步骤)
-    - [1.1. 登录青龙面板并修改配置](#11-登录青龙面板并修改配置)
-    - [1.2. 在青龙面板中添加拉库定时任务](#12-在青龙面板中添加拉库定时任务)
-        - [1.2.1. 方式一：订阅管理](#121-方式一订阅管理)
-        - [1.2.2. 方式二：定时任务拉库](#122-方式二定时任务拉库)
-    - [1.3. 检查定时任务](#13-检查定时任务)
-    - [1.4. 配置青龙Client Secret（可选）](#14-配置青龙client-secret可选)
-        - [1.4.1. 新建 Application](#141-新建-application)
-        - [1.4.2. 密钥配置到环境变量](#142-密钥配置到环境变量)
-    - [1.5. Bili登录](#15-bili登录)
-- [2. 先行版](#2-先行版)
-- [3. GitHub加速](#3-github加速)
-- [4. 常见问题](#4-常见问题)
-    - [4.1. 安装dotnet失败怎么办法](#41-安装dotnet失败怎么办法)
-    - [4.2. Couldn't find a valid ICU package installed on the system](#42-couldnt-find-a-valid-icu-package-installed-on-the-system)
-    - [4.3. 提示文件不存在或路径异常，怎么排查](#43-提示文件不存在或路径异常怎么排查)
-    - [4.4. The configured user limit (128) on the number of inotify instances has been reached](#44-the-configured-user-limit-128-on-the-number-of-inotify-instances-has-been-reached)
+In Qinglong's **Configuration File** page, change `RepoFileExtensions="js py"` to:
 
-<!-- /TOC -->
-
-## 1. 步骤
-
-### 1.1. 登录青龙面板并修改配置
-青龙面板，`配置文件`页。
-
-修改 `RepoFileExtensions="js py"` 为 `RepoFileExtensions="js py sh"`
-
-保存配置。
-
-### 1.2. 在青龙面板中添加拉库定时任务
-
-两种方式，任选其一即可：
-
-#### 1.2.1. 方式一：订阅管理
-
-```
-名称：Bilibili
-类型：公开仓库
-链接：https://github.com/RayWangQvQ/BiliBiliToolPro.git
-定时类型：crontab
-定时规则：2 2 28 * *
-白名单：bili_task_.+\.sh
-文件后缀：sh
+```text
+RepoFileExtensions="js py sh"
 ```
 
-没提到的不要动。
+Save the configuration.
 
-保存后，点击运行按钮，运行拉库。
+### Add a repository pull task
 
-#### 1.2.2. 方式二：定时任务拉库
-青龙面板，`定时任务`页，右上角`添加任务`，填入以下信息：
+Choose **one** of these methods.
 
-```
-名称：拉取Bili库
-命令：ql repo https://github.com/RayWangQvQ/BiliBiliToolPro.git "bili_task_"
-定时规则：2 2 28 * *
-```
+**Subscription Management:** Create a subscription with the following fields; leave other settings unchanged:
 
-点击确定。
-
-保存成功后，找到该定时任务，点击运行按钮，运行拉库。
-
-### 1.3. 检查定时任务
-
-如果正常，拉库成功后，会自动添加bilibili相关的task任务。
-
-![qinglong-tasks.png](../docs/imgs/qinglong-tasks.png)
-
-### 1.4. 配置青龙Client Secret（可选）
-
-扫码登录Bili后，需要有权限向青龙的环境变量中持久化Cookie，所以需要添加一个鉴权。
-
-青龙官方说明：https://qinglong.online/api/preparation
-
-#### 1.4.1. 新建 Application
-
-青龙 -> 系统设置 -> 应用设置，点击新建。
-
-![qinglong-application](../docs/imgs/qinglong-application.png)
-
-#### 1.4.2. 密钥配置到环境变量
-
-将上面2个值添加到环境变量中即可。
-
-Name分别为：
-
-- Ray_QingLongConfig__ClientId
-- Ray_QingLongConfig__ClientSecret
-
-![qinglong-app-env](../docs/imgs/qinglong-application-key.png)
-
-
-### 1.5. Bili登录
-
-在青龙定时任务中，点击运行`bili扫码登录`任务，查看运行日志，扫描日志中的二维码进行登录。
-![qinglong-login.png](../docs/imgs/qinglong-login.png)
-
-登录成功后，如果已配置了上述的Application，会将cookie保存到青龙的环境变量中：
-
-![qinglong-env.png](../docs/imgs/qinglong-env.png)
-
-如果未配置Application，会打印出cookie，请手动自己到环境变量中添加。
-
-首次运行会自动安装环境，时间可能长一点，之后就不需要重复安装了。
-
-## 2. 先行版
-
-青龙拉库时可以指定分支，develop分支的代码会超前于默认的main分支，包含当前正在开发的新功能。
-
-想提前体验新功能，或想要Bug能快速得到解决的朋友，可以尝试切换先行版，但同时也意味着稳定性会相应降低（其实可以忽略不计~🤨）。
-
-```
-分支：develop
-白名单：bili_dev_task_.+\.sh
+```text
+Name: Bilibili
+Type: Public repository
+URL: https://github.com/RayWangQvQ/BiliBiliToolPro.git
+Schedule type: crontab
+Schedule: 2 2 28 * *
+Whitelist: bili_task_.+\.sh
+File extension: sh
 ```
 
-其他选项同上。
+Save and run the subscription once.
 
-## 3. GitHub加速
+**Scheduled Tasks:** In **Scheduled Tasks → Add Task**, enter:
 
-拉库时，如果服务器在国内，访问GitHub速度慢，可在仓库地址前加上加速代理进行加速。
-
-如：
-
+```text
+Name: Pull Bili repository
+Command: ql repo https://github.com/RayWangQvQ/BiliBiliToolPro.git "bili_task_"
+Schedule: 2 2 28 * *
 ```
+
+Save and run the pull task once.
+
+### Check the scheduled tasks
+
+After a successful pull, Qinglong should register the Bilibili task scripts.
+
+![Qinglong tasks](../../docs/imgs/qinglong-tasks.png)
+
+## Optional: enable automatic Cookie persistence
+
+To let QR sign-in save Cookies to Qinglong environment variables, set up an application with panel API access. See the [Qinglong API preparation instructions](https://qinglong.online/api/preparation).
+
+1. In Qinglong, go to **System Settings → Application Settings** and create an application.
+
+   ![Qinglong application](../../docs/imgs/qinglong-application.png)
+
+2. Add its two values as environment variables named `Ray_QingLongConfig__ClientId` and `Ray_QingLongConfig__ClientSecret`.
+
+   ![Qinglong application credentials](../../docs/imgs/qinglong-application-key.png)
+
+## Sign in to Bilibili
+
+Run the **bili扫码登录** (Bili QR sign-in) task in Qinglong. Scan the QR code displayed in its log.
+
+![Qinglong QR sign-in](../../docs/imgs/qinglong-login.png)
+
+With the application configured, the Cookie is saved to Qinglong's environment variables:
+
+![Qinglong environment variables](../../docs/imgs/qinglong-env.png)
+
+Without it, copy the Cookie printed in the log and add it to the panel's environment variables manually. The first task run may take longer while the runtime is installed.
+
+## Early builds
+
+Repository pulls should use `main`. The former `develop` branch and `dev/bili_dev_task_*` scripts have been removed. For unreleased changes, the alpha channel publishes the `zai7lou/bili_tool_web:alpha` **Docker image**, not a `bilitool` binary. It is a separate Docker deployment, not an alternate Qinglong pull branch.
+
+## Slow GitHub downloads
+
+If GitHub access from the server is slow, you may prefix the repository URL with a proxy, for example:
+
+```text
 https://github.moeyy.xyz/https://github.com/RayWangQvQ/BiliBiliToolPro.git
 https://gh-proxy.com/https://github.com/RayWangQvQ/BiliBiliToolPro.git
-...
 ```
 
-加速代理地址通常不能保证长期稳定，请自行查找使用。
+Third-party proxy availability is not guaranteed.
 
-## 4. 常见问题
+## Environment variables
 
-### 4.1. 安装dotnet失败怎么办法
+`BILI_REPO` and `BILI_BRANCH` override which repository and branch the scripts look for. They default to `raywangqvq/bilibilitoolpro` and the main branch, so set them only when running from a fork.
 
-`dotnet` 运行模式需要 .NET 10 SDK。脚本会自动检查版本，并在低于 .NET 10 时安装或升级。
-
-首先，青龙有两个版本的镜像：
-
-- alpine：whyour/qinglong:latest
-- debian：whyour/qinglong:debian
-
-Alpine `3.23` 可通过包管理器安装 `dotnet10-sdk`，脚本会自动使用此方式。较旧的 Alpine 镜像没有可用的 .NET 10 包；使用 `dotnet` 模式时脚本会停止并提示升级镜像或切换运行模式。
-
-若使用较旧 Alpine，或 .NET 安装仍失败，可以切换到基于`bilitool`的二进制包运行方式，该方式不需要安装`dotnet`，方式：
-
-编辑青龙面板的`配置文件`，新增如下两行：
-
-```
-export BILI_MODE="bilitool" # bili运行模式，dotnet或bilitool
-export BILI_GITHUB_PROXY="https://github.moeyy.xyz/" # 下载二进制包时使用的加速代理，不要的话则置空
+```bash
+export BILI_REPO=raywangqvq/bilibilitoolpro # repository owner/name
+export BILI_BRANCH=                        # branch suffix; leave empty for main
 ```
 
-![qinglong-login.png](../docs/imgs/qinglong-run-as-bilitool.png)
+## Troubleshooting
 
-bilitool没有先行版的概念，因为只有main分支才会打包，更新会稍慢一点。
+### .NET installation fails
 
-### 4.2. Couldn't find a valid ICU package installed on the system
+`dotnet` mode requires the .NET 10 SDK. The scripts check the installed version and install or upgrade it if needed. Qinglong has Alpine (`whyour/qinglong:latest`) and Debian (`whyour/qinglong:debian`) image variants; check the actual OS version inside your container. On Alpine, the scripts use the `dotnet10-sdk` package when the image is Alpine 3.23 or newer. On an older Alpine image, upgrade it or switch to `bilitool` mode.
 
-如 #266 ，需要在青龙面板的环境变量添加如下环境变量：
+SDK detection accepts a single version or multiple SDK-list rows, including installation paths. It still checks `dotnet --version` in the current directory: a `global.json` selection failure or a selected SDK below .NET 10 is not treated as a usable installation merely because `dotnet --list-sdks` contains a newer SDK.
 
-```
-名称：DOTNET_SYSTEM_GLOBALIZATION_INVARIANT
-值：1
-```
+Add these lines in the panel **Configuration File** to use a release binary instead:
 
-### 4.3. 提示文件不存在或路径异常，怎么排查
-
-需要`docker exec -it qinglong bash`后，查看几个常用路径：
-
-```
-/ql
-    /data
-        /repo
-    /scripts
-    /shell
+```bash
+export BILI_MODE="bilitool" # dotnet or bilitool
+export BILI_GITHUB_PROXY="https://github.moeyy.xyz/" # optional binary-download proxy; use "" to disable
 ```
 
-- `/ql/dada/repo`目录下存储了拉库后，bilitool的源代码
-- `/ql/scripts`目录下存储了bilitool的定时运行脚本
-- `/ql/shell`目录下是青龙的基础脚本
+![Select the bilitool runtime](../../docs/imgs/qinglong-run-as-bilitool.png)
 
-请cd到相应目录，查看该目录下文件是否存在，状态是否正常。
+`bilitool` release binaries are published with stable releases; alpha builds publish Docker images only.
 
-### 4.4. The configured user limit (128) on the number of inotify instances has been reached
+### No valid ICU package found
 
-报错：
+If the task reports `Couldn't find a valid ICU package installed on the system` (see issue #266), add this Qinglong environment variable:
 
+```text
+Name: DOTNET_SYSTEM_GLOBALIZATION_INVARIANT
+Value: 1
 ```
-Asp.Net Core - The configured user limit (128) on the number of inotify instances has been reached
-```
 
-可以尝试添加如下环境变量解决：
+### Missing files or unexpected paths
 
-```
+Enter the Qinglong container (`docker exec -it qinglong bash`) and inspect `/ql/data/repo` (or `/ql/repo` on older installations), `/ql/scripts`, and `/ql/shell`. The repository checkout, scheduled scripts, and Qinglong shell scripts respectively live in those locations; verify the paths in your installation rather than relying on a fixed layout.
+
+### Inotify instance limit reached
+
+For `The configured user limit (128) on the number of inotify instances has been reached`, add:
+
+```text
 DOTNET_USE_POLLING_FILE_WATCHER=1
 ```
 
-添加后，对配置变更事件的监听，会从监听 Linux 系统的 inotify 事件，变成定时轮询。
+This changes .NET configuration-change watching from inotify events to polling.

@@ -79,8 +79,8 @@ dotnet() {
 
 # 目录
 CURRENT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-# 脚本在 baihu/DefaultTasks/ 下，需向上跳两级到达仓库根目录
-baihu_bili_repo_dir="$(dirname $(dirname "$CURRENT_DIR"))"
+# 脚本在 platforms/baihu/DefaultTasks/ 下，需向上跳三级到达仓库根目录
+baihu_bili_repo_dir="$(dirname $(dirname $(dirname "$CURRENT_DIR")))"
 say "bili仓库目录: $baihu_bili_repo_dir"
 
 current_linux_os="debian"  # 或alpine
@@ -403,7 +403,7 @@ install() {
             install_dotnet || {
                 say_err "安装失败"
                 say_err "请根据文档自行在白虎面板环境中安装dotnet（进入“编程语言”页面安装）"
-                say_err "或者尝试切换运行模式为bilitool，它不需要安装dotnet：https://github.com/RayWangQvQ/BiliBiliToolPro/blob/develop/platforms/baihu/README.md"
+                say_err "或者尝试切换运行模式为bilitool，它不需要安装dotnet：https://github.com/RayWangQvQ/BiliBiliToolPro/blob/main/platforms/baihu/README.md"
                 return 1
             }
         fi
@@ -411,7 +411,7 @@ install() {
         if [ "$prefer_mode" == "bilitool" ]; then
             install_bilitool || {
                 say_err "安装失败，请检查日志并重试"
-                say_err "或者尝试切换运行模式为dotnet：https://github.com/RayWangQvQ/BiliBiliToolPro/blob/develop/platforms/baihu/README.md"
+                say_err "或者尝试切换运行模式为dotnet：https://github.com/RayWangQvQ/BiliBiliToolPro/blob/main/platforms/baihu/README.md"
             }
         fi
     fi

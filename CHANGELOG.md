@@ -1,3 +1,71 @@
+## 4.2.3
+- feat(live-lottery): pre-filter TianXuan by pendant 504/1432 + live list API v3 (#1092)
+- fix: view 接口改用 WBI 签名，修复 -412 (request was banned) (#1239)
+- fix(release): dedup release notes by dropping body_path (#1235)
+- Bump coverlet.collector from 6.0.4 to 10.1.0 (#1199)
+- Migrate bunit 1.x to 2.x API (#1126)
+- Bump Swashbuckle.AspNetCore from 8.1.4 to 10.2.3 (#1200)
+- Bump xunit.runner.visualstudio from 3.1.5 to 4.0.0 (#1201)
+- chore(ci): archive Tencent SCF deploy workflow (#1236)
+- docs(changelog): 4.2.2 (#1233)
+## 4.2.2
+- Fix cookie check false 'login failed' due to timeout race (#1231)
+- test: consolidate IApiApi tests into ApiApiTests (#1230)
+- docs(changelog): 4.2.1 (#1229)
+## 4.2.1
+- feat(web): refine account login and today-task page (#1226)
+- feat(web): add sponsor section to About page (#1224)
+- fix(qinglong): harden the install and update path (#1216)
+- test: add IGaiaApi functional tests and fix LiveApiTests namespace (#1223)
+- ci(release): restore GitHub auto-generated release notes (#1222)
+- docs(changelog): 4.2.0 (#1221)
+## 4.2.0
+- feat: enroll the web device fingerprint to fix share -403 (#1214)
+- feat(daily): configure an account level threshold for coin donation (#1207)
+- feat: 改进任务配置、粉丝牌名单与后台通知 (#1202)
+- feat(web): rebuild the admin account page and split rename from password change (#1187)
+- fix: tolerate malformed cookie entries during account probing (#1197)
+- fix: skip share and coin pre-checks when risk control rejects them (#1215)
+- fix: 修复青龙多 SDK 版本输出导致的 .NET 环境误判 (#1210)
+- fix: 修正升级预估的取整和硬币保留值计算 (#1211)
+- fix(web): restore saved task enablement before starting Quartz (#1204)
+- fix(web): honor the VIP privilege switch in today task status (#1203)
+- Fix/standalone login and heading focus (#1191)
+- Fix unauthorized login link and local SDK setup (#1189)
+- refactor: route cookie-expiry and task-failure reminders through the shared notification pipeline (#1219)
+- chore: remove the unused moderate-comments workflow (#1218)
+- test: standardize test suites and assertions (#1194)
+- docs: rewrite README and deployment guides in English (#1193)
+- Remove cookies.json dependency from Web panel (#1192)
+- Refresh Web dashboard visual design (#1190)
+- chore(deps): bump softprops/action-gh-release from 2 to 3 (#1163)
+- refactor(ci): consolidate PR checks and clarify Actions names (#1188)
+- docs(changelog): 4.1.1 (#1186)
+## 4.1.1
+- fix(web): publish Blazor framework scripts so the panel stays interactive (#1184)
+- fix(web): pin app version footer to the bottom of the sidebar drawer (#1183)
+- fix(web): prevent sidebar from covering content on narrow viewports (#1182)
+- docs(changelog): 4.1.0 (#1181)
+## 4.1.0
+- feat(web): 全站 MudBlazor 化、首页 UI 重做与暗色模式 (#1179)
+- feat(web): 今日任务页 UI 重做，并补上侧边栏缺失的图标 (#1178)
+- feat(web): 面板展示应用版本 (#1176)
+- fix: changelog job 不再尝试 auto-merge，改为开到 PR 等维护者合并（#1159） (#1175)
+- Bump Scrutor from 6.1.0 to 7.0.0 (#1169)
+- perf(ci): 镜像构建改为宿主机架构交叉编译，不再用 QEMU 模拟 arm64 (#1177)
+- docs(changelog): 4.0.8 (#1174)
+## 4.0.8
+- fix: changelog 回写改走 auto-merge PR 流，适配 main 的 ruleset 保护（#1159） (#1170)
+- 维护[#1153]: 发布策略重构——CI 托管版本号与单主干 alpha/stable 通道 (#1160)
+- refactor: 删除 platforms 的 dev 先行版变体脚本（#1159） (#1172)
+- chore(deps): bump docker/setup-qemu-action from 3 to 4 (#1165)
+- chore(deps): bump docker/setup-buildx-action from 3 to 4 (#1164)
+- chore(deps): bump actions/checkout from 2 to 7 (#1162)
+- docs: version-next.sh 头注登记 CI-skip 标记导致 alpha 断号的坑 (#1171)
+- chore(deps): bump actions/setup-dotnet from 4 to 6 (#1161)
+## 4.0.7
+- Fix[#1144]: Web 面板启动失败改为以非 0 退出码结束（此前恒为 0），Docker / 青龙等编排层不再把「启动崩溃」当成「正常退出」；退出码由运行时决定、不保证跨平台一致（Linux 134，Windows `0xE0434352`）
+- Fix[#1147][#1149]: 补齐 #1138 迁移到 `platforms/` 后仍遗留的旧路径（两轮）：呆呆/白虎的 `copyshfile.sh` 钩子与白虎任务脚本定位仓库根少一级、青龙 `bili_task_tryFix.sh` 找不到 dotnet 安装脚本、docker/podman 构建脚本的上下文多退一级，另有 5 个平台 README 共 30 处 `../docs/` 断链
 ## 4.0.6
 - **BREAKING[#1138]**: 部署平台目录统一迁移至 `platforms/` 下（`docker`、`podman`、`qinglong`、`baihu`、`daidai`、`helm`、`tencentScf`、`gitHubActions`、`krew`）；按 `raw.githubusercontent.com/.../main/<旧路径>` 直接拉取脚本或示例文件的存量部署会 404，请改用 `platforms/<平台>/...`
 - Fix[#1140]: 修复 Web 面板启动时因模型与迁移不一致（`PendingModelChangesWarning`）而直接退出的问题；首次启动会自动为 `QRTZ_TRIGGERS`/`QRTZ_FIRED_TRIGGERS` 补列并创建 `QRTZ_PAUSED_JOB_GRPS` 表
