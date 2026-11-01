@@ -17,7 +17,6 @@ on:
 permissions:
   contents: write # 建 tag、GitHub Release、CHANGELOG 回写
   packages: write # 推 GHCR
-  discussions: write # 发版时自动开 Discussion
 
 # 一次发版全流程串行，避免并发算出同一个版本号
 concurrency:
@@ -94,7 +93,6 @@ jobs:
           generate_release_notes: "true"
           previous_tag: ${{ needs.determine-version.outputs.since }}
           files: ./src/Ray.BiliBiliTool.Console/bin/Publish/*.zip
-          discussion_category_name: Announcements
           make_latest: "true"
           fail_on_unmatched_files: true
 
