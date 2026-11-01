@@ -429,13 +429,41 @@ run_task() {
     cd $baihu_bili_repo_dir/src/Ray.BiliBiliTool.Console
 
     if [ "$prefer_mode" == "dotnet" ]; then
-        # 动态创建临时 props 文件以禁用警告，保持仓库根目录整洁
-        local props_file="$baihu_bili_repo_dir/Directory.Build.props"
-        printf '<Project>\n  <PropertyGroup>\n    <NoWarn>$(NoWarn);NETSDK1188;CS9057;CS8618;CS9042;CS8625;CS8603;CS8602;CS8601;CS8600;CS8604</NoWarn>\n  </PropertyGroup>\n</Project>' > "$props_file"
-        
-        dotnet run -v m -- --ENVIRONMENT=Production
-        
-        rm -f "$props_file"
+        local bili_dll="bin/Debug/net10.0/Ray.BiliBiliTool.Console.dll"
+
+        # 面板靠 stdout 管道 EOF 判断进程结束。关闭编译守护进程并直接运行产物，
+        # 避免 MSBuild / Roslyn 继承管道后导致任务被误判为超时。
+        # 源码没变时复用上次产物；订阅拉取换了源码（mtime 变新）或产物被删则重新编译。
+        local need_build=1
+        if [ -f "$bili_dll" ] && [ -z "$(find "$baihu_bili_repo_dir/src" \
+                \( -name '*.cs' -o -name '*.csproj' -o -name 'appsettings*.json' \) \
+                -newer "$bili_dll" -print -quit 2>/dev/null)" ]; then
+            need_build=0
+        fi
+
+        if [ "$need_build" = "1" ]; then
+            # 临时 props 文件压制编译告警，保持日志整洁，编译完即删
+            local props_file="$baihu_bili_repo_dir/Directory.Build.props"
+            local props_created=false
+            if [ ! -f "$props_file" ]; then
+                printf '<Project>\n  <PropertyGroup>\n    <NoWarn>$(NoWarn);NETSDK1188;CS9057;CS8618;CS9042;CS8625;CS8603;CS8602;CS8601;CS8600;CS8604</NoWarn>\n  </PropertyGroup>\n</Project>' >"$props_file"
+                props_created=true
+            fi
+            local bili_build_log="$baihu_bili_repo_dir/bin/bili_build.log"
+            if ! dotnet build -v q -nodeReuse:false -p:UseSharedCompilation=false >"$bili_build_log" 2>&1; then
+                say_err "编译失败，最后 30 行日志："
+                tail -30 "$bili_build_log" >&2
+                if [ "$props_created" = true ]; then rm -f "$props_file"; fi
+                return 1
+            fi
+            if [ "$props_created" = true ]; then rm -f "$props_file"; fi
+        else
+            say "源码无变化，跳过编译（复用上次产物）"
+        fi
+
+        local rc=0
+        dotnet "$bili_dll" --ENVIRONMENT=Production || rc=$?
+        return $rc
     else
         cp -f $baihu_bili_repo_dir/bin/Ray.BiliBiliTool.Console .
         chmod +x ./Ray.BiliBiliTool.Console && ./Ray.BiliBiliTool.Console --ENVIRONMENT=Production
